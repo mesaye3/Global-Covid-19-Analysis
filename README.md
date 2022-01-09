@@ -1,4 +1,4 @@
-# Global-Covid-19-Analysis
+# Global-Covid-19-Analysis 📚🧑🏻‍💻
 Covid-19 analysis using global dataset from 2020 to 2021
 
 # Summary 
