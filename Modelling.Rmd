@@ -368,7 +368,6 @@ print(accuracy*100)
 ```
 
 
-It can be observed that the accuracy of the hierarchical clustering is 100%
 
 
 
