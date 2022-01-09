@@ -1,0 +1,375 @@
+---
+title: "Modelling"
+author: "MB"
+date: "12/8/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE,warning=FALSE)
+```
+
+
+
+## Load data
+
+```{r}
+#Load data
+df2 <- read.csv("covid_19_data.csv")
+head(df2, 2)
+```
+
+
+### Data Preparation
+
+In the process of data preparation, all missing values and the negative values were eliminated from the dataset. In addition, a new variable (Recovery Rate) was created. This was created to show two classes(0= low recovery rate and 1=high recovery rate). To create this variable, all recovery values above the mean were considered as high while all values below the mean were considered as low.
+
+
+```{r}
+library(dplyr)
+#check all missing values
+sapply(df2, function(k) sum(is.na(k)))
+#exclude all rows with negative values
+df2 <- df2[df2$Recovered >= 0, ]
+df2 <- df2[df2$Recovered < 100000, ]
+
+#clean data
+df2 <- subset(df2, select = c(Recovered,Deaths,Confirmed,Country.Region))
+ #create a new variable that has classes
+df2 <- df2 %>% mutate(Recovery_Rate =
+                     case_when(Recovered < 10044~ "0",
+                              Recovered >= 10044 ~ "1")
+)
+
+df2$Recovery_Rate <- as.factor(df2$Recovery_Rate)#convert column spread_rate into factor
+
+head(df2,3)
+```
+
+
+#  Model 1: Linear Discriminant Analysis 
+
+**Load libraries**
+
+```{r}
+#load libraries
+library(MASS)
+library(tidyverse)
+library(caret)
+
+library(ggplot2)
+library(MASS)
+library(mvtnorm)
+theme_set(theme_classic())
+```
+
+
+**Split Data**
+
+The data is now ready to be used in the model. We'll divide the data into testing and training observation as a first stage. The data is split in an 80-20 ratio, so 160001 observations are used to train the model and 39999 observations are used to evaluate it.
+
+
+```{r}
+# Split the data into training (80%) and test set (20%)
+df <- df2[1:200000,]
+df <- na.omit(df)
+set.seed(123)
+training.individuals <- df$Recovery_Rate %>% 
+            createDataPartition(p = 0.8, list = FALSE)
+train.data <- df[training.individuals, ]
+test.data <- df[-training.individuals, ]
+dim(train.data)
+dim(test.data)
+```
+
+**LDA Model**
+
+Prior probabilities of groups - The prior probability of a response class for an observation is defined here. This means that 79.9% of all recoveries were little, while 20.1 percent of all recoveries were large.
+Group Means – The mean value (k) for response classes for a given X=x is defined here. When different features fit into a particular response class, this reflects their mean values. For their recovery rate class, we notice a clear difference between the proportion of recovered cases vs deaths (1501.454 vs 679.7164). The greater the gap between the mean, the easier it is to classify observations.
+Linear discriminant coefficients - The coefficient of the linear equation that is used to classify the response classes is defined here. Because there are only two response classes in this model, there will only be one set of coefficients (LD1).
+
+```{r}
+#create LDA model
+ldamodel = lda (factor(Recovery_Rate)~Recovered + Deaths +Confirmed, data=train.data)
+ldamodel
+
+plot(ldamodel)
+```
+
+**LDA Model Prediction**
+
+
+```{r}
+##Predicting training results.
+ldaPrediction = predict(ldamodel, data=train.data)
+table(Predicted=ldaPrediction$class, Recovery_Rate=train.data$Recovery_Rate)
+
+```
+
+**Plot Results**
+
+partition plots to see how well the model classified the response class based on recovered, death and confirmed
+
+
+```{r}
+library(klaR)
+
+partimat(Recovery_Rate~Recovered+ Deaths+Confirmed, method="lda",data=test.data, main= "Partition Plots")
+
+```
+
+
+
+**LDA Model Accuracy**
+
+This section's goal is to determine the model accuracy for training data. The accuracy of the LDA model is 73.68%, as can be seen.
+
+```{r}
+# Model accuracy
+mean(ldaPrediction$class==test.data$Recovery_Rate)*100
+
+predmodeltestlda = predict(ldamodel, newdata=test.data)#prediction on test data
+table(Predicted=predmodeltestlda$class, Recovery_Rate=test.data$Recovery_Rate)
+```
+
+# * ROC Curve *
+
+```{r , fig.width=7, fig.height=5}
+#plot classes
+#install.packages("pROC")
+
+#library(pROC)
+
+par(pty = "s")
+
+roc(test.data$Recovery_Rate,predmodeltestlda$posterior[,2], plot=TRUE,legacy.axes = TRUE, 
+percent =TRUE, xlab="False Positive Percentage", ylab="True Positive Percentage", main="ROC Curve")
+
+
+```
+
+
+
+# Model 2: Regression Tree Model
+
+
+The predictor space is stratified or segmented into a number of simple sections in tree-based classification and regression approaches. Decision tree methods are a type of methodology that can be used to solve both regression and classification problems. A regression tree is used to anticipate a quantitative response (i.e., guessing a numeric value). A classification tree is used to predict a qualitative response (i.e., classifying an observation). Non-parametric methods for partitioning data into smaller, more "pure" or homogeneous groups called nodes are decision trees.
+
+Maximizing accuracy or, equivalently, limiting misclassification error is a straightforward approach to define purity in classification. In other words, the split nodes will have a higher fraction of one class in each node. Each node is stated as an if/then rule to do this. The node is filled with cases that meet the if/then statement. For each split, two things are determined: the splitting variable, which is the predictor variable used for the split, and the split point, which is the set of values for the predictor variable (which is split between the left and right nodes).
+**Libraries**
+
+```{r}
+# For decision tree model
+library(rpart)
+# For data visualization
+library(rpart.plot)
+```
+
+
+**Data prep**
+
+```{r}
+#filter data
+df3 <- df[10000:20000,]
+df3 <- na.omit(df3)
+set.seed(234)
+#test and training data
+train = sample(1:nrow(df3))
+Recoverytrain=df3[train,]
+```
+
+
+
+**Regression Tree**
+
+```{r}
+# Build the regression tree on the training set
+fit.tree = rpart(Recovered~ ., data=Recoverytrain, control=rpart.control(cp=0.08))
+summary(fit.tree)
+#fit.tree
+```
+
+
+**Visualizing regression Tree**
+
+```{r}
+#visualize regression tree
+rpart.plot(fit.tree)
+
+```
+
+
+
+```{r}
+#check variable importance
+fit.tree$variable.importance
+```
+
+
+
+
+**Pruning Regression Tree**
+
+We prune the tree by selecting the optimal CP value from the cp table based on the lowest cross-validation error (xerror).
+
+```{r}
+##finding the best cp involves overfitting the data by choosing  smaller cp value
+myoverfittedtree=rpart(Recovered~ ., data=Recoverytrain,control=rpart.control(cp=0.008))
+
+# to see out of sample performance of a tree
+
+printcp(myoverfittedtree)
+plotcp(myoverfittedtree)
+
+# find cp value that minimizes the error
+
+opt_cp=myoverfittedtree$cptable[which.min(myoverfittedtree$cptable[,"xerror"]),"CP"]
+
+# the best tree
+opt_cp
+
+# best out of sample performances
+
+mybesttree=rpart(Recovered~ ., data=Recoverytrain,control=rpart.control(cp=opt_cp))
+printcp(mybesttree)
+rpart.plot(mybesttree)
+
+```
+
+
+
+
+# Model 3: Hierarchical clustering
+
+**Hierarchical clustering**
+
+Hierarchical clustering is an unsupervised non-linear process in which groups are produced in a hierarchical order (or a pre-determined ordering). Objects are grouped into a hierarchy comparable to a tree-shaped structure in hierarchical clustering, which is used to analyze hierarchical clustering models.
+
+
+
+The hierarchical clustering process is as follows:
+
+i) It starts by calculating the distance between every pair of observation points and store it in a distance matrix.
+
+ii) It then puts every point in its own cluster.
+
+iii) Then it starts merging the closest pairs of points based on the distances from the distance matrix and as a result the amount of clusters goes down by 1.
+
+iv) Then it recomputes the distance between the new cluster and the old ones and stores them in a new distance matrix.
+
+v) Lastly it repeats steps 2 and 3 until all the clusters are merged into one single cluster.
+
+
+
+
+```{r}
+#data preparation
+library(factoextra)
+df5 <- df2[3000:3039,]
+df4 <- subset(df5, select = c(Recovered,Deaths,Confirmed,Recovery_Rate))
+
+# Omitting any NA values
+df4 <- na.omit(df4)
+ 
+# Scaling dataset
+#df4 <- scale(df4)
+
+```
+
+
+
+**Distance Matrix**
+
+The values are shown as per the distance matrix calculation with the method as euclidean.
+
+```{r}
+#distance matrix
+dist_mat <- dist(df4, method = 'euclidean')
+```
+
+
+**Cluster Model**
+
+In the model, the cluster method is average, distance is euclidean and no. of objects are 40.
+
+
+**Dendrogram :**Distances are transformed into heights in a dendrogram, which is a hierarchy of clusters. It divides n units or objects into smaller groups, each with a p property. A horizontal line connects units in the same cluster. Individual units are represented by the leaves at the bottom. It shows clusters as a visual representation.
+
+```{r , fig.width=10, fig.height=7}
+#first clusters dendrogram
+hclust_avg <- hclust(dist_mat, method = 'average')
+hclust_avg
+plot(hclust_avg)
+```
+
+
+
+
+
+
+
+```{r , fig.width=10, fig.height=7}
+#cut the dendrogram tree into 2 clusters
+cut_avg <- cutree(hclust_avg, k = 2)
+plot(hclust_avg)
+rect.hclust(hclust_avg , k = 2, border = 2:6)
+abline(h = 2, col = 'red')
+```
+
+
+
+
+
+```{r , fig.width=10, fig.height=7}
+#install.packages('package_name', dependencies = TRUE)
+suppressPackageStartupMessages(library(dendextend))
+avg_dend_obj <- as.dendrogram(hclust_avg)
+avg_col_dend <- color_branches(avg_dend_obj)
+plot(avg_col_dend, main="Covid 19 Recovery Clusters ")
+
+```
+
+
+
+
+```{r}
+#cluster values
+suppressPackageStartupMessages(library(dplyr))
+df_cluster <- mutate(df4, cluster = cut_avg)
+count(df_cluster,cluster)
+```
+
+
+
+
+
+
+**Accuracy of the hierarchical clustering**
+
+```{r}
+#create a target
+target = ifelse(df4$Recovery_Rate=="0","0","1")
+table(target)
+clusters =cutree(hclust_avg, k=2)
+table(clusters,target)
+```
+
+
+```{r}
+#accuracy of the hierarchical clustering
+cm = as.matrix(table(Actual = target, Predicted = clusters))
+cm
+accuracy = sum(diag(cm)) / sum(cm) 
+print(accuracy*100)
+
+
+
+```
+
+
+It can be observed that the accuracy of the hierarchical clustering is 100%
+
+
+
+

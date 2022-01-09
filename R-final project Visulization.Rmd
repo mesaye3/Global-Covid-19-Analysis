@@ -1,0 +1,293 @@
+---
+title: "covid19 visulization"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load covid-19 data and libraries
+
+
+```{r pressure, echo=FALSE}
+library(ggplot2)
+library(ggplot2)
+#install.packages("anytime")
+library(anytime)
+#install.packages("usmap")
+library(usmap)
+library(tidyverse)
+library(dplyr)
+theme_set(theme_bw())
+```
+
+
+
+
+
+
+# Data preprocessing
+```{r pressure, echo=FALSE}
+df <- read_csv("covid_19_data.csv",
+col_types = cols(ObservationDate = col_date(format = "%m/%d/%Y")))
+
+# rename the column name
+colnames(df) <- c("SNo","Date","Province","Country","Update","Confirmed","Deaths","Recovered")
+
+df <- df %>%
+    mutate(Province = case_when(
+        Province == "France"~"",
+        Province == "United Kingdom"~"",
+        Province == "UK"~"",
+        Province == "Netherlands"~"",
+        Province == "Denmark"~"",
+        Province == "US"~"",
+        Province == "Canada"~"",
+        Province == "Russia"~"",
+        Province == "Italy"~"",
+        TRUE ~ Province))
+
+#check all missing values
+sapply(df, function(k) sum(is.na(k)))
+
+# drop missing values
+df1<-na.omit(df)
+df1
+```
+
+
+
+
+# Exploratory Data Analysis of Covid-19 confirmed cases
+
+# picked  6 countries from different continents to examine the daily death 
+
+# US daily death from 2020-2021
+
+```{r pressure, echo=FALSE}
+
+us <- df1 %>%
+    filter(Country == "US") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(us,Date >= anydate("03/15/2020") & Date < anydate("04/14/2021")), aes(x = Date, y = daily_deaths, color= daily_deaths)) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+
+
+# Canada daily death from 2020-2021
+
+
+```{r pressure, echo=FALSE}
+
+CAN <- df1 %>%
+    filter(Country == "Canada") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(CAN,Date >= anydate("03/15/2020") & Date < anydate("04/14/2021")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+
+
+# Brazil daily death from 2020-2021
+
+```{r pressure, echo=FALSE}
+
+bra <- df1 %>%
+    filter(Country == "Brazil") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(bra,Date >= anydate("02/15/2020") & Date < anydate("07/14/2021")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+# China daily death from 2020-2021
+
+```{r pressure, echo=FALSE}
+
+china <- df1 %>%
+    filter(Country == "Mainland China") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(china,Date >= anydate("01/15/2020") & Date < anydate("03/14/2021")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+## upclose look into china highest spike
+
+```{r pressure, echo=FALSE}
+
+china <- df1 %>%
+    filter(Country == "Mainland China") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(china,Date >= anydate("04/01/2020") & Date < anydate("05/01/2020")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+
+
+
+# Australia
+
+```{r pressure, echo=FALSE}
+
+aus <- df1 %>%
+    filter(Country == "Australia") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(aus,Date >= anydate("03/15/2020") & Date < anydate("04/14/2021")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+
+```{r pressure, echo=FALSE}
+
+mex <- df1 %>%
+    filter(Country == "Mexico") %>%
+    group_by(Date) %>%
+    summarize(total_deaths = sum(Deaths)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1))
+
+
+ggplot(subset(mex,Date >= anydate("03/15/2020") & Date < anydate("04/14/2021")), aes(x = Date, y = daily_deaths, color=daily_deaths )) +
+    geom_col() +
+    ylab(label = "Daily Deaths") + 
+    xlab("Date")
+
+```
+
+
+
+# Top total confirmed cases  across the globe
+
+```{r}
+df1_country <- df1 %>%
+    group_by(Country, Date) %>%
+    summarize(total_deaths = sum(Deaths), total_confirmed = sum(Confirmed)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1), 
+           daily_confirmed = total_confirmed - lag(total_confirmed,1))
+
+last <- df1_country %>%
+    arrange(desc(Date)) %>%
+    filter(!duplicated(Country)) %>%
+    arrange(desc(total_confirmed))
+
+print(last[1:20,])
+last$Country[1:8]
+
+ggplot(filter(df1_country, Country %in% last$Country[1:10], Date< anydate("06/15/2020")),
+      aes(x = Date, y = total_confirmed, color = Country)) + geom_line()
+
+```
+
+# Top total death cases  across the globe early stage and later stage of the pandemic
+
+
+```{r}
+df1_country <- df1 %>%
+    group_by(Country, Date) %>%
+    summarize(total_deaths = sum(Deaths), total_confirmed = sum(Confirmed)) %>%
+    mutate(weekday = weekdays(Date), daily_deaths = total_deaths - lag(total_deaths,1), 
+           daily_confirmed = total_confirmed - lag(total_confirmed,1))
+
+last <- df1_country %>%
+    arrange(desc(Date)) %>%
+    filter(!duplicated(Country)) %>%
+    arrange(desc(total_confirmed))
+
+print(last[1:20,])
+last$Country[1:8]
+
+g1<-ggplot(filter(df1_country, Country %in% last$Country[1:10], Date < anydate("05/15/2020")),
+      aes(x = Date, y = total_deaths, color = Country)) + geom_line()
+
+g2<-ggplot(filter(df1_country, Country %in% last$Country[1:10], Date > anydate("04/15/2020")),
+      aes(x = Date, y = total_deaths, color = Country)) + geom_line()
+
+library(gridExtra)
+grid.arrange(g1,g2)
+
+```
+
+
+
+```{r}
+# World confirmed with counts in log10 scale
+ggplot(df1, aes(x=Date, y=Confirmed,color= Confirmed)) + geom_line() +
+  theme_classic() +
+  labs(title = "Covid-19 Global Confirmed Cases in log scale", x= "Days", y= "Daily confirmed cases  (log scale)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(trans="log10")
+
+```
+# Mapping Covid-19 confirmed cases
+
+```{r}
+# Map
+library(tmap)
+data(World)
+class(World)
+countrytotal <- df1 %>% group_by(Country) %>% summarize(cumulativeconfirmed=sum(Confirmed), cumulativedeaths=sum(Deaths), cumulativerecovered=sum(Recovered))
+
+# Combine basemap data to covid data
+countrytotal$Country[!countrytotal$Country %in% World$name]
+list <- which(!countrytotal$Country %in% World$name)
+countrytotal$country <- as.character(countrytotal$Country)
+
+
+countrytotal$Country[!countrytotal$Country %in% World$name]
+World$country <- World$name
+worldmap <- left_join(World, countrytotal, by="country")
+worldmap$cumulativeconfirmed[is.na(worldmap$cumulativeconfirmed)] <- 0
+
+
+
+# Map
+ggplot(data = worldmap) + geom_sf(aes(fill=cumulativeconfirmed), color="black") +
+  ggtitle("World Map of Confirmed Covid Cases",
+          subtitle="Total Cases on May 29, 2021") +
+  theme_bw()
+
+
+
+
+```
+
+
+
